@@ -1,2 +1,5 @@
 python PreSequenceLDhot.py --input ../input/MPR.cross.uniq
 
+echo "Summary map for RILs"
+python MapSummary.py --input ../input/MPR.cross.uniq --bin ../input/MPR.geno.bin.uniq
+

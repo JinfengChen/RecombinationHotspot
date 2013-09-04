@@ -7,6 +7,7 @@ import argparse
 def usage():
     message='''
 python PreSequenceLDhot.py --input ../input/MPR.cross.uniq  --output pipe.conf
+The script read *.map and *.cro file as input, parse the input file and output Datafile for SequenceLDhot.
 --input: input is a prefix of .cro and .map. ../input/MPR.cross.uniq will stand for ../input/MPR.cross.uniq.cro and ../input/MPR.cross.uniq.map
 --output: output is then prefix of output file. Rice will make the output file to Rice.Infile1 and Rice.Datafile. Optional, Defaule is SeqLDhot.
 
