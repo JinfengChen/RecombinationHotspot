@@ -1,5 +1,8 @@
 #!/opt/Python/2.7.3/bin/python
 import sys
+sys.path.append("/rhome/cjinfeng/software/ProgramPython/module/lib")
+from dictionary import dict_add
+from numpy  import *
 import re
 import os
 import argparse
@@ -15,86 +18,77 @@ The script read *.map and *.cro as input, parse and output general summary of th
     '''
     print message
 
-def datafilehaplotype(cro,data1,markerl,markern,chr):
-    chrdata = open(data1,'w')
-    nsample = 0
-    with open(cro, 'r') as cross:
-        s1   = re.compile(r'^-s')
-        s2   = re.compile(r'^\d+')
-        sn   = re.compile(r'^-n\s+(\d+)')
-        sp   = re.compile(r'^-p\s+(\d+)')
-        tag1 = 0
-        tag2 = 0
-        num  = 0
-        for line in cross:
-            if sn.search(line):
-                m = sn.search(line)
-                nsample = m.groups(0)[0]
-            if sp.search(line):
-                m = sp.search(line)
-                nloci = m.groups(0)[0]
-                chrdata.write('Distinct = '+str(nsample)+'\n')
-                chrdata.write('Gene = '+str(nsample)+'\n')
-                chrdata.write('Loci = '+str(markern)+'\n')
-                chrdata.write('I=1 %treat data as SNPs'+'\n')
-                chrdata.write('K = 2 %a-allele model with Haplotype Alleles by 1,2'+'\n')
-                chrdata.write('Positions of loci:'+'\n')
-                chrdata.write(markerl+'\n')
-                chrdata.write('Haplotypes'+'\n') 
-            if s1.search(line):
-                tag1 = 1
-            if s2.search(line) and tag1 == 1:
-                tag2 = 1
-                num  = -1
-            num += 1
-            if tag1 == 1 and tag2 == 1:
-                if num == chr:
-                    #print num
-                    #print line
-                    line = re.sub(r'\s+',r'',line)
-                    line = re.sub(r'0',r'1',line)
-                    chrdata.write('         '+line+' 1\n')
-    chrdata.write('#\n')
-    chrdata.close()
+'''Kick out chr from full chrlist if this line (rank) does not contain genetic distance of this chr'''
+def listvalidchr(chrlist, binn, rank):
+    copylist = chrlist[:]
+    #print copylist
+    for i in range(len(binn)):
+        if int(rank) > int(binn[i]):
+            #print i
+            copylist.remove(int(i)+1)
+    return copylist
 
-def datafilehead(gmap,chr):
-    marker = []
-    with open(gmap, 'r') as gmap:
-        s0   = re.compile(r'^-b MarkerNames')
-        s1   = re.compile(r'^-e MarkerNames')
-        s2   = re.compile(r'^'+str(chr)+r'\b')
-        tag1 = 0
-        tag2 = 0
-        num  = 0
-        for line in gmap:
-            if s0.search(line):
-                tag1 = 1
+'''Summary recombination bin, genetic distance, recombiantion rate for each chromosome'''
+def Chr_breakpoint(mapfile,chrbp,recombinant):
+    chrlist   = range(1,13)
+    binn      = []
+    data      = []
+    gdistance = {}
+    chrlen    = {1:43270923, 2:35937250, 3:36413819, 4:35502694, 5:29958434, 6:31248787, 7:29697621, 8:28443022, 9:23012720, 10:23207287, 11:29021106, 12:27531856} 
+    with open(mapfile, 'r') as mapfh:
+        s0   = re.compile(r'^-l')
+        s1   = re.compile(r'^-Number')
+        for line in mapfh:
             if s1.search(line):
-                tag1 = 0
-            if s2.search(line) and tag1 == 1:
                 line = line.rstrip()
-                unit = line.split(' ')
-                pos  = unit[2]
-                pos  = pos[2:]
-                marker.append(int(pos))
-    markernum  = len(marker)
-    markerline = ' '.join(map(str,marker))
-    return (markerline,markernum)
+                unit = re.split(r'\s+',line)
+                binn = unit[2:]
+                print binn 
+            if s0.search(line):
+                data.append(line)
+    for line in data:
+        line = line.rstrip()
+        unit = re.split(r'\s+',line)
+        distanceline = unit[3:]
+        if int(unit[1]) == int(0):
+            continue
+        #print unit 
+        newchrlist = listvalidchr(chrlist, binn, unit[1])
+        #print newchrlist
+        for i in range(len(distanceline)):
+            gdistance.setdefault(newchrlist[i],[]).append(distanceline[i])
+    #print "\n".join(gdistance[1])
+    chrfh = open (chrbp,'w')
+    chrfh.write('Chr\t#Bin\t#Recombinant\tMean genetic distance (cM)\tTotal genetic distance (cM)\tPhysical length (Mb)\tRecombination Rate (cM/Mb)\n')
+    sumall = {}
+    distance = []
+    for c in sorted (gdistance.keys()):
+        distance.extend(gdistance[c])
+        gdistance[c] = map (float,gdistance[c])
+        cmean   = "%.2f" %mean(gdistance[c])
+        cmedian = "%.2f" %median(gdistance[c])
+        ctotal  = sum(gdistance[c])
+        ctotal  = "%.2f" %ctotal
+        cmin    = min(gdistance[c])
+        cmax    = max(gdistance[c])
+        clen    = "%.2f" %(float(chrlen[c])/1000000.00)
+        crate   = float(ctotal)/float(clen)
+        crate   = "%.2f" %crate
+        sumall['binn']   = sumall['binn'] + int(binn[int(c)-1]) if sumall.has_key('binn') else int(binn[int(c)-1])
+        sumall['total']  = sumall['total'] + float(ctotal) if sumall.has_key('total') else float(ctotal)
+        sumall['genome'] = sumall['genome'] + float(clen) if sumall.has_key('genome') else float(clen)
+        print c, cmean, cmedian, cmin, cmax, ctotal 
+        crecom  = str(recombinant[int(c)-1])
+        chrfh.write('Chr'+str(c)+'\t'+binn[int(c)-1]+'\t'+crecom+'\t'+str(cmean)+'\t'+str(ctotal)+'\t'+str(clen)+'\t'+str(crate)+'\n')
+    sumall['rate'] = float(sumall['total'])/float(sumall['genome'])
+    sumall['rate'] = "%.2f" %sumall['rate']
+    sumall['genome'] = "%.2f" %sumall['genome']
+    sumall['total'] = "%.2f" %sumall['total']
+    sumall['distance'] = "%.2f" %mean(map(float, distance))
+    chrfh.write('Total'+'\t'+str(sumall['binn'])+'\t'+str(recombinant[12])+'\t'+sumall['distance']+'\t'+sumall['total']+'\t'+sumall['genome']+'\t'+sumall['rate']+'\n')
+    chrfh.close()
 
-def dict_add( dict0, key1, key2, value ):
-   if dict0.has_key(key1):
-       temp  = dict0.copy()
-       dict1 = temp[key1]
-       dict1.update({key2:value})
-       temp[key1] = dict1
-   else:
-       temp  = dict0.copy()
-       dict1 = {key2:value}
-       temp.update({key1:{key2:value}})
-
-   return temp
-
-
+'''Summary recombination bin for each RIL on each chromosome'''
 def RIL_breakpoint(binfile,rilsbp):
     genotype={}
     breakpoint={}
@@ -141,15 +135,17 @@ def RIL_breakpoint(binfile,rilsbp):
     rilsbpfh = open (rilsbp,'w')
     rilsheader = ''
     rilsmatrix = ''
+    chrsum = {}
     for r in sorted (map (int, breakpoint.keys())):
         r = str(r)
         total = 0
         rilsbpdata=[]
         rilshead  =['RILs']
-        rilsbpdata.append('GNN' + r)
+        rilsbpdata.append('GN' + r)
         breakpointc = breakpoint[r]
         for c in sorted (breakpointc.keys()):
             chromosome = int (c)
+            chrsum[chromosome] = chrsum[chromosome] + int(breakpointc[c]) if chrsum.has_key(chromosome) else int(breakpointc[c])
             total += breakpointc[c]
             rilsbpdata.append(breakpointc[c])
             rilshead.append('Chr' + str(chromosome))
@@ -158,11 +154,19 @@ def RIL_breakpoint(binfile,rilsbp):
         rilsbpline = "\t".join(map(str,rilsbpdata))
         rilsheader = "\t".join(map(str,rilshead))
         rilsmatrix = rilsmatrix + rilsbpline + '\n'
-
+     
     rilsbpfh.write(rilsheader + '\n')
     rilsbpfh.write(rilsmatrix)
+    '''Sum for each chromosome and output total for each chromosome'''
+    totalsum = []
+    for c in sorted (chrsum.keys()):
+        #print chrsum[c]
+        totalsum.append(chrsum[c])
+    totalsum.append(sum(totalsum))
+    lastline = "\t".join(map (str, totalsum))
+    rilsbpfh.write('Total\t'+str(lastline)+'\n')
     rilsbpfh.close()
-
+    return totalsum
      
 def main():
     parser = argparse.ArgumentParser()
@@ -187,9 +191,9 @@ def main():
     chrbp     = args.output + '.Chr.Breakpoint.table'
     rilbp     = args.output + '.RIL.Breakpoint.table'
     summary   = args.output + '.General.Summary.table'
-   
-    #Chr_breakpoint()
-    RIL_breakpoint(binfile,rilbp)
+    
+    recombinant = RIL_breakpoint(binfile,rilbp) 
+    Chr_breakpoint(mapfile,chrbp,recombinant)
     #GeneralSum()
      
 '''     
