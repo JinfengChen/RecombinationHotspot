@@ -2,6 +2,7 @@
 import sys
 sys.path.append("/rhome/cjinfeng/software/ProgramPython/module/lib")
 from dictionary import dict_add
+from collections import defaultdict
 from numpy  import *
 import re
 import os
@@ -34,10 +35,15 @@ def Chr_breakpoint(mapfile,chrbp,recombinant):
     binn      = []
     data      = []
     gdistance = {}
-    chrlen    = {1:43270923, 2:35937250, 3:36413819, 4:35502694, 5:29958434, 6:31248787, 7:29697621, 8:28443022, 9:23012720, 10:23207287, 11:29021106, 12:27531856} 
+    chrlen    = {1:43270923, 2:35937250, 3:36413819, 4:35502694, 5:29958434, 6:31248787, 7:29697621, 8:28443022, 9:23012720, 10:23207287, 11:29021106, 12:27531856}
+    markername = defaultdict(list) 
     with open(mapfile, 'r') as mapfh:
         s0   = re.compile(r'^-l')
         s1   = re.compile(r'^-Number')
+        s2   = re.compile(r'^-b MarkerNames')
+        s3   = re.compile(r'^-e MarkerNames')
+        s4   = re.compile(r'^(\d+) (\d+) (\d+)')
+        flag = 0
         for line in mapfh:
             if s1.search(line):
                 line = line.rstrip()
@@ -46,6 +52,32 @@ def Chr_breakpoint(mapfile,chrbp,recombinant):
                 print binn 
             if s0.search(line):
                 data.append(line)
+            if s2.search(line):
+                flag = 1
+            if s3.search(line):
+                flag = 0
+            if flag == 1 and s4.search(line):
+                m = s4.search(line)
+                chrname = m.groups(0)[0]
+                marker  = m.groups(0)[2]
+                marker  = int(marker[2:])
+                markername[chrname].append(marker)
+    '''parse markername to calculate bin size'''
+    chrbinsize = {}
+    allbinsize = []
+    for c in sorted (markername.keys()):
+        binsize = []
+        lasts   = 0
+        for b in markername[c]:
+            size  = b - lasts
+            lasts = b
+            binsize.append(size)
+        allbinsize.extend(binsize)
+        meansize = mean(binsize)
+        chrbinsize[str(c)] = int (meansize/1000.00)
+        print c, meansize
+    allmeansize = int (mean(allbinsize)/1000.00)
+    '''parse genetic map to calculate genetic distance'''
     for line in data:
         line = line.rstrip()
         unit = re.split(r'\s+',line)
@@ -59,7 +91,7 @@ def Chr_breakpoint(mapfile,chrbp,recombinant):
             gdistance.setdefault(newchrlist[i],[]).append(distanceline[i])
     #print "\n".join(gdistance[1])
     chrfh = open (chrbp,'w')
-    chrfh.write('Chr\t#Bin\t#Recombinant\tMean genetic distance (cM)\tTotal genetic distance (cM)\tPhysical length (Mb)\tRecombination Rate (cM/Mb)\n')
+    chrfh.write('Chr\t#Bin\tBin size (kb)\t#Recombinant\tMean genetic distance (cM)\tTotal genetic distance (cM)\tPhysical length (Mb)\tRecombination Rate (cM/Mb)\n')
     sumall = {}
     distance = []
     for c in sorted (gdistance.keys()):
@@ -79,13 +111,14 @@ def Chr_breakpoint(mapfile,chrbp,recombinant):
         sumall['genome'] = sumall['genome'] + float(clen) if sumall.has_key('genome') else float(clen)
         print c, cmean, cmedian, cmin, cmax, ctotal 
         crecom  = str(recombinant[int(c)-1])
-        chrfh.write('Chr'+str(c)+'\t'+binn[int(c)-1]+'\t'+crecom+'\t'+str(cmean)+'\t'+str(ctotal)+'\t'+str(clen)+'\t'+str(crate)+'\n')
+        cbinsize= chrbinsize[str(c)]
+        chrfh.write('Chr'+str(c)+'\t'+binn[int(c)-1]+'\t'+str(cbinsize)+'\t'+crecom+'\t'+str(cmean)+'\t'+str(ctotal)+'\t'+str(clen)+'\t'+str(crate)+'\n')
     sumall['rate'] = float(sumall['total'])/float(sumall['genome'])
     sumall['rate'] = "%.2f" %sumall['rate']
     sumall['genome'] = "%.2f" %sumall['genome']
     sumall['total'] = "%.2f" %sumall['total']
     sumall['distance'] = "%.2f" %mean(map(float, distance))
-    chrfh.write('Total'+'\t'+str(sumall['binn'])+'\t'+str(recombinant[12])+'\t'+sumall['distance']+'\t'+sumall['total']+'\t'+sumall['genome']+'\t'+sumall['rate']+'\n')
+    chrfh.write('Total'+'\t'+str(sumall['binn'])+'\t'+str(allmeansize)+'\t'+str(recombinant[12])+'\t'+sumall['distance']+'\t'+sumall['total']+'\t'+sumall['genome']+'\t'+sumall['rate']+'\n')
     chrfh.close()
 
 '''Summary recombination bin for each RIL on each chromosome'''
