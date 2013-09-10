@@ -11,7 +11,7 @@ import argparse
 def usage():
     message='''
 python MapSummary.py --input ../input/MPR.cross.uniq --bin ../input/MPR.geno.bin.uniq  --output HEG4vsNB
-The script read *.map and *.cro as input, parse and output general summary of the map.
+The script read *.map, *.cro and MPR.geno.bin.uniq as input, parse and output general summary of the map.
 --input: input is a prefix of .cro and .map. ../input/MPR.cross.uniq will stand for ../input/MPR.cross.uniq.cro and ../input/MPR.cross.uniq.map
 --bin:   marker-RILs matrix of uniq bin map
 --output: output is then prefix of output file. Optional, Defaule is HEG4vsNB.
@@ -58,13 +58,14 @@ def Chr_breakpoint(mapfile,chrbp,recombinant):
                 flag = 0
             if flag == 1 and s4.search(line):
                 m = s4.search(line)
-                chrname = m.groups(0)[0]
+                chrname = int (m.groups(0)[0])
                 marker  = m.groups(0)[2]
                 marker  = int(marker[2:])
                 markername[chrname].append(marker)
     '''parse markername to calculate bin size'''
     chrbinsize = {}
     allbinsize = []
+    print '>Binsize (kb)\nChr\tMean\tMedian\tMin\tMax'
     for c in sorted (markername.keys()):
         binsize = []
         lasts   = 0
@@ -73,10 +74,13 @@ def Chr_breakpoint(mapfile,chrbp,recombinant):
             lasts = b
             binsize.append(size)
         allbinsize.extend(binsize)
-        meansize = mean(binsize)
-        chrbinsize[str(c)] = int (meansize/1000.00)
-        print c, meansize
-    allmeansize = int (mean(allbinsize)/1000.00)
+        meansize   = "%.2f" %(mean(binsize)/1000.00)
+        mediansize = "%.2f" %(median(binsize)/1000.00)
+        minsize    = "%.2f" %(min(binsize)/1000.00)
+        maxsize    = "%.2f" %(max(binsize)/1000.00)
+        chrbinsize[str(c)] = meansize
+        print c, meansize, mediansize, minsize, maxsize
+    allmeansize = "%.2f" %(mean(allbinsize)/1000.00)
     '''parse genetic map to calculate genetic distance'''
     for line in data:
         line = line.rstrip()
@@ -94,6 +98,7 @@ def Chr_breakpoint(mapfile,chrbp,recombinant):
     chrfh.write('Chr\t#Bin\tBin size (kb)\t#Recombinant\tMean genetic distance (cM)\tTotal genetic distance (cM)\tPhysical length (Mb)\tRecombination Rate (cM/Mb)\n')
     sumall = {}
     distance = []
+    print '>Genetic distance (cM)\nChr\tMean\tMedian\tMin\tMax\tTotal'
     for c in sorted (gdistance.keys()):
         distance.extend(gdistance[c])
         gdistance[c] = map (float,gdistance[c])
