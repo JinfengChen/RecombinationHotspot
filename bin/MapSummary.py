@@ -219,7 +219,7 @@ def main():
         usage()
         sys.exit(2)
     if (args.output is None):
-        args.output = 'HEG4svNB'       
+        args.output = 'HEG4vsNB'       
 
     print 'INPUT file is' + args.input
     print 'OUTPUT file is' + args.output
