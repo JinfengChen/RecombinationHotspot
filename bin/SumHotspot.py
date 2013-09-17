@@ -176,8 +176,8 @@ def hotspot_recombinant (binfile, markerdata):
             else:
                 '''physical distance between two bin is the distance from the midpoint of two bin'''
                 mid       = float(lastmkpos) + (int(p)-lastmkpos)/2
-                physicald = int(p) - int(lastmkpos)
-                #physicald = float(mid) - float(lastmkmid)
+                #physicald = int(p) - int(lastmkpos)
+                physicald = float(mid) - float(lastmkmid)
                 #print int(p), lastmkpos, mid, lastmkmid, physicald
                 '''recombiantion frequency: r = R/2(1-R). Refrence A High-Resolution Map of Arabidopsis Recombinant Inbred Lines by Whole-Genome Exon Array Hybridization'''
                 R         = float(breakpoint[c][p])/float(samplen)
@@ -346,10 +346,7 @@ def main():
     mapfile = args.input + '.map'
     markercm= Genetic_distance(mapfile)
     hotspot_recombinant(binfile, markercm)
-    #marker_segregation(binfile) 
-    #chisquare_hotspot(10,108) 
-    #chisquare_hotspot(20,98) 
-    #chisquare_hotspot(30,88)   
+    marker_segregation(binfile) 
 
 if __name__ == '__main__':
     main()
